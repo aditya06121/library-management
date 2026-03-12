@@ -3,6 +3,8 @@ name: Fullstack CI/CD
 on:
   push:
     branches: [main]
+    paths:
+      - "server/**"
 
 jobs:
   build-and-test:
@@ -11,44 +13,52 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ---------- Setup Node ----------
+      # Setup Node
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
+          cache: "npm"
+          cache-dependency-path: server/package-lock.json
 
-      # ---------- Backend ----------
+      # Install backend dependencies
       - name: Install backend dependencies
         working-directory: server
-        run: npm install
+        run: npm ci
 
+      # Run backend tests
       - name: Run backend tests
         working-directory: server
         run: npm test
 
   deploy:
     needs: build-and-test
-    runs-on: self-hosted
+    runs-on: [self-hosted, linux, arm]
 
     steps:
       - uses: actions/checkout@v4
 
-      # ---------- Setup Node on Pi ----------
+      # Setup Node on Pi
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
+      # Create deployment directory
       - name: Prepare directories
         run: |
-          mkdir -p /home/pi/apps/fullstack-app/server
+          mkdir -p $HOME/apps/fullstack-app/server
 
+      # Install production dependencies
       - name: Install backend production dependencies
         working-directory: server
-        run: npm install --omit=dev
+        run: npm ci --omit=dev
 
+      # Deploy backend
       - name: Deploy backend
-        run: rsync -av --delete server/ /home/pi/apps/fullstack-app/server/
+        run: |
+          rsync -av --delete server/ $HOME/apps/fullstack-app/server/
 
+      # Restart backend service
       - name: Restart backend
         run: sudo systemctl restart fullstack-app
