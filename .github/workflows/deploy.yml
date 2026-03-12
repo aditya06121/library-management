@@ -50,4 +50,7 @@ jobs:
         run: |
           pkill -f "node index.js" || true
           cd $HOME/apps/fullstack-app/server
-          setsid node index.js > server.log 2>&1 < /dev/null &
+          nohup node index.js > server.log 2>&1 &
+          disown $!
+          sleep 2
+          kill -0 $! && echo "Server started successfully (PID: $!)" || echo "Server failed to start"
