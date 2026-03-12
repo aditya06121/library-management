@@ -25,6 +25,7 @@ jobs:
         run: npm test
 
   deploy:
+    needs: build-and-test
     runs-on: self-hosted
 
     steps:
@@ -48,4 +49,5 @@ jobs:
       - name: Restart backend
         run: |
           pkill -f "node index.js" || true
-          nohup node $HOME/apps/fullstack-app/server/index.js > $HOME/apps/fullstack-app/server/server.log 2>&1 &
+          cd $HOME/apps/fullstack-app/server
+          nohup node index.js > server.log 2>&1 &
