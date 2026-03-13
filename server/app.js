@@ -3,7 +3,7 @@ import express from "express";
 const app = express();
 
 app.get("/", (req, res) => {
-  res.json({ message: "backend running on pi zero" });
+  res.json({ message: "backend is running!!!!" });
 });
 
 app.get("/health", (req, res) => {
