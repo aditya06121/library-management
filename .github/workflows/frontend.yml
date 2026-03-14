@@ -1,0 +1,36 @@
+name: Frontend CI/CD
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "client/**"
+
+jobs:
+  deploy-frontend:
+    runs-on: self-hosted
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Prepare directories
+        run: mkdir -p $HOME/apps/fullstack-app/client
+
+      - name: Install frontend dependencies
+        working-directory: client
+        run: npm install
+
+      - name: Build frontend
+        working-directory: client
+        run: npm run build
+
+      - name: Deploy frontend
+        run: rsync -av --delete client/dist/ $HOME/apps/fullstack-app/client/
+
+      - name: Reload nginx
+        run: sudo systemctl reload nginx
