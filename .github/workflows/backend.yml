@@ -48,5 +48,8 @@ jobs:
       - name: Remove dev dependencies
         run: npm prune --omit=dev
 
+      - name: Deploy backend
+        run: rsync -av --delete ${{ github.workspace }}/server/ $HOME/apps/fullstack-app/server/
+
       - name: Restart backend service
         run: sudo systemctl restart app
