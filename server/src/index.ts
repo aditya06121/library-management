@@ -1,9 +1,10 @@
-import { buildApp } from "./app.js";
-
-const app = buildApp();
+import app from "./app.js";
+import "dotenv/config";
+import dbConnect from "./db.js";
 
 const start = async () => {
   try {
+    await dbConnect();
     await app.listen({ port: 3000, host: "0.0.0.0" });
     console.log("Server running on port 3000");
   } catch (err) {

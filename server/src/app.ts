@@ -1,12 +1,7 @@
 import Fastify from "fastify";
 
-export function buildApp() {
-  const app = Fastify();
+const app = Fastify();
 
-  app.get("/api/dice", async () => {
-    const roll = Math.floor(Math.random() * 6) + 1;
-    return { roll };
-  });
+app.register(import("./routes/auth.routes.js"));
 
-  return app;
-}
+export default app;
