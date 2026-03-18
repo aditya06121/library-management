@@ -19,7 +19,6 @@ app.setErrorHandler((error, _req, reply) => {
 
     return reply.status(429).send(failure("RATE_LIMIT_EXCEEDED", details));
   }
-
   return reply.send(error);
 });
 
