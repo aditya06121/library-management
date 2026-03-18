@@ -18,6 +18,30 @@ const registerSuccessDataSchema = {
   },
 };
 
+const authFailureSchema = createApiFailureSchema();
+const authDbFailureResponses = {
+  500: authFailureSchema,
+};
+const emptySuccessDataSchema = {
+  type: "object",
+  additionalProperties: false,
+};
+
+const meSuccessDataSchema = {
+  type: "object",
+  required: ["user"],
+  properties: {
+    user: {
+      type: "object",
+      required: ["userId", "email"],
+      properties: {
+        userId: { type: "string" },
+        email: { type: "string", format: "email" },
+      },
+    },
+  },
+};
+
 export const registerSchema = {
   body: {
     type: "object",
@@ -30,6 +54,45 @@ export const registerSchema = {
   },
   response: {
     201: createApiSuccessSchema(registerSuccessDataSchema),
-    409: createApiFailureSchema(),
+    409: authFailureSchema,
+    ...authDbFailureResponses,
+  },
+};
+
+export const loginSchema = {
+  body: {
+    type: "object",
+    required: ["email", "password"],
+    properties: {
+      email: { type: "string", format: "email" },
+      password: { type: "string", minLength: 6 },
+    },
+  },
+  response: {
+    200: createApiSuccessSchema(registerSuccessDataSchema),
+    401: authFailureSchema,
+    ...authDbFailureResponses,
+  },
+};
+
+export const refreshSchema = {
+  response: {
+    200: createApiSuccessSchema(emptySuccessDataSchema),
+    401: authFailureSchema,
+    ...authDbFailureResponses,
+  },
+};
+
+export const logoutSchema = {
+  response: {
+    200: createApiSuccessSchema(emptySuccessDataSchema),
+    ...authDbFailureResponses,
+  },
+};
+
+export const meSchema = {
+  response: {
+    200: createApiSuccessSchema(meSuccessDataSchema),
+    401: authFailureSchema,
   },
 };

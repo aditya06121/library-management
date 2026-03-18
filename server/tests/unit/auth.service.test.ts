@@ -2,11 +2,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { registerUser } from "../../src/services/auth.register.js";
 import { prisma } from "../../src/db.js";
 import bcrypt from "bcrypt";
+import { Prisma } from "@prisma/client";
 
 vi.mock("../../src/db.js", () => ({
   prisma: {
     user: {
-      findUnique: vi.fn(),
       create: vi.fn(),
     },
     session: {
@@ -19,6 +19,7 @@ vi.mock("bcrypt");
 vi.mock("../../src/utils/auth.token.js", () => ({
   generateAccessToken: vi.fn(() => "access-token"),
   generateRefreshToken: vi.fn(() => "refresh-token"),
+  hashRefreshToken: vi.fn(() => "hashed-refresh-token"),
 }));
 
 describe("registerUser", () => {
@@ -28,8 +29,6 @@ describe("registerUser", () => {
 
   it("should create user and return tokens", async () => {
     const email = `${Date.now()}@mail.com`;
-
-    (prisma.user.findUnique as any).mockResolvedValue(null);
 
     (bcrypt.hash as any).mockResolvedValue("hashed_password");
 
@@ -57,10 +56,13 @@ describe("registerUser", () => {
   it("should fail if email exists", async () => {
     const email = `${Date.now()}@mail.com`;
 
-    (prisma.user.findUnique as any).mockResolvedValue({
-      id: "1",
-      email,
-    });
+    (bcrypt.hash as any).mockResolvedValue("hashed_password");
+    (prisma.user.create as any).mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError("Email already exists", {
+        code: "P2002",
+        clientVersion: "test",
+      }),
+    );
 
     const result = await registerUser({
       name: "test",

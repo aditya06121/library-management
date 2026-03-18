@@ -3,7 +3,9 @@ import bcrypt from "bcrypt";
 import {
   generateAccessToken,
   generateRefreshToken,
+  hashRefreshToken,
 } from "../utils/auth.token.js";
+import { Prisma } from "@prisma/client";
 
 type RegisterInput = {
   name: string;
@@ -15,7 +17,7 @@ export type RegisterUserResult =
   | {
       ok: true;
       user: {
-        id: number;
+        id: string;
         email: string;
       };
       accessToken: string;
@@ -23,53 +25,74 @@ export type RegisterUserResult =
     }
   | {
       ok: false;
-      code: "EMAIL_EXISTS";
+      code: "EMAIL_EXISTS" | "DB_CALL_FAILED";
       details: string;
     };
 
 export async function registerUser(input: RegisterInput) {
   const { name, email, password } = input;
 
-  const existing = await prisma.user.findUnique({
-    where: { email },
-  });
+  const hashedPassword = await bcrypt.hash(password, 10);
 
-  if (existing) {
+  let user: { id: string; email: string };
+
+  // Create user (atomic, concurrency-safe)
+  try {
+    user = await prisma.user.create({
+      data: {
+        name,
+        email,
+        password: hashedPassword,
+      },
+      select: {
+        id: true,
+        email: true,
+      },
+    });
+  } catch (e) {
+    if (
+      e instanceof Prisma.PrismaClientKnownRequestError &&
+      e.code === "P2002"
+    ) {
+      return {
+        ok: false,
+        code: "EMAIL_EXISTS",
+        details: "Email already exists",
+      } satisfies RegisterUserResult;
+    }
+
     return {
       ok: false,
-      code: "EMAIL_EXISTS",
-      details: "Email already exists",
+      code: "DB_CALL_FAILED",
+      details: "Failed to connect to db",
     } satisfies RegisterUserResult;
   }
 
-  const hashedPassword = await bcrypt.hash(password, 10);
-
-  const user = await prisma.user.create({
-    data: {
-      name,
-      email,
-      password: hashedPassword,
-    },
-    select: {
-      id: true,
-      email: true,
-    },
-  });
-
   const payload = { userId: user.id, email: user.email };
 
-  const accessToken = generateAccessToken(payload);
-  const refreshToken = generateRefreshToken(payload);
+  // Generate refresh token first
+  const refreshToken = await generateRefreshToken(payload);
+  const hashedRefreshToken = await hashRefreshToken(refreshToken);
 
-  const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
+  // Store session
+  try {
+    await prisma.session.create({
+      data: {
+        userId: user.id,
+        refreshToken: hashedRefreshToken,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+      },
+    });
+  } catch {
+    return {
+      ok: false,
+      code: "DB_CALL_FAILED",
+      details: "Failed to connect to db",
+    } satisfies RegisterUserResult;
+  }
 
-  await prisma.session.create({
-    data: {
-      userId: user.id,
-      refreshToken: hashedRefreshToken,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7d
-    },
-  });
+  // Generate access token after session is persisted
+  const accessToken = await generateAccessToken(payload);
 
   return {
     ok: true,

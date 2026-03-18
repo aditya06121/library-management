@@ -6,7 +6,6 @@ export type ApiError = {
 };
 
 export type ApiResponse<T = unknown> = {
-  statusCode: number;
   success: boolean;
   message: string;
   data?: T;
@@ -14,13 +13,8 @@ export type ApiResponse<T = unknown> = {
 };
 
 // ---- success response ----
-export function success<T>(
-  statusCode = 200,
-  message: string,
-  data?: T,
-): ApiResponse<T> {
+export function success<T>(message: string, data?: T): ApiResponse<T> {
   return {
-    statusCode,
     success: true,
     message,
     ...(data !== undefined && { data }),
@@ -28,13 +22,8 @@ export function success<T>(
 }
 
 // ---- failure response ----
-export function failure(
-  statusCode = 400,
-  code: string,
-  details?: string,
-): ApiResponse {
+export function failure(code: string, details?: string): ApiResponse {
   return {
-    statusCode,
     success: false,
     message: "Request failed",
     error: {
@@ -47,9 +36,8 @@ export function failure(
 export function createApiSuccessSchema(dataSchema?: Record<string, unknown>) {
   return {
     type: "object",
-    required: ["statusCode", "success", "message"],
+    required: ["success", "message"],
     properties: {
-      statusCode: { type: "number" },
       success: { type: "boolean", const: true },
       message: { type: "string" },
       ...(dataSchema ? { data: dataSchema } : {}),
@@ -60,9 +48,8 @@ export function createApiSuccessSchema(dataSchema?: Record<string, unknown>) {
 export function createApiFailureSchema() {
   return {
     type: "object",
-    required: ["statusCode", "success", "message", "error"],
+    required: ["success", "message", "error"],
     properties: {
-      statusCode: { type: "number" },
       success: { type: "boolean", const: false },
       message: { type: "string" },
       error: {

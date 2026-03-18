@@ -1,24 +1,19 @@
 import { FastifyRequest, FastifyReply } from "fastify";
-import { registerUser } from "../services/auth.register.js";
 import { failure, success } from "../utils/response.js";
+import { loginUser } from "../services/auth.login.js";
 
-export async function registerHandler(req: FastifyRequest, res: FastifyReply) {
-  const { email, name, password } = req.body as {
+export async function loginHandler(req: FastifyRequest, res: FastifyReply) {
+  const { email, password } = req.body as {
     email: string;
     password: string;
-    name: string;
   };
-
-  const result = await registerUser({ name, email, password });
-
+  const result = await loginUser({ email, password });
   if (!result.ok) {
-    const statusCode = result.code === "DB_CALL_FAILED" ? 500 : 409;
+    const statusCode = result.code === "DB_CALL_FAILED" ? 500 : 401;
 
     return res.status(statusCode).send(failure(result.code, result.details));
   }
-
-  const { accessToken, refreshToken, user } = result;
-
+  const { user, accessToken, refreshToken } = result;
   // set access token cookie
   res.setCookie("accessToken", accessToken, {
     httpOnly: true,
@@ -38,5 +33,5 @@ export async function registerHandler(req: FastifyRequest, res: FastifyReply) {
   });
 
   // return minimal body
-  return res.status(201).send(success("USER_CREATED", { user }));
+  return res.status(200).send(success("LOGGED_IN", { user }));
 }
