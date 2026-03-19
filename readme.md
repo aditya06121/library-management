@@ -63,14 +63,24 @@ sudo systemctl restart app
 
 ## Nginx Config
 
-**File:** `/etc/nginx/sites-available/fullstack-app`
+**File:** `/etc/nginx/sites-enabled/app`
+
+> ⚠️ This file is loaded directly by nginx (confirmed via `sudo nginx -T`). Do not edit `sites-available/default` — it is not used.
 
 ```nginx
 server {
-    listen 80;
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
 
     location /api/ {
-        proxy_pass http://localhost:3000;
+        rewrite ^/api/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 
     location / {
@@ -80,12 +90,20 @@ server {
 }
 ```
 
-**Symlink to enable:**
+> The `rewrite` rule strips `/api/` before forwarding to the backend, so a request to `/api/auth/login` reaches the backend as `/auth/login`.
+> `127.0.0.1` is used instead of `localhost` to avoid IPv6 resolution issues on the Pi.
+
+**Edit and reload:**
 
 ```bash
-sudo ln -s /etc/nginx/sites-available/fullstack-app /etc/nginx/sites-enabled/
-sudo rm /etc/nginx/sites-enabled/default
-sudo systemctl restart nginx
+sudo nano /etc/nginx/sites-enabled/app
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+**Verify which config files nginx is loading:**
+
+```bash
+sudo nginx -T | grep "# configuration file"
 ```
 
 ---
@@ -130,6 +148,7 @@ jobs:
   deploy-backend:
     runs-on: self-hosted
     timeout-minutes: 15
+    environment: secrets
 
     defaults:
       run:
@@ -158,6 +177,16 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Setup env
+        run: |
+          echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> .env
+          echo "DIRECT_URL=${{ secrets.DIRECT_URL }}" >> .env
+          echo "ACCESS_TOKEN_SECRET=${{ secrets.ACCESS_TOKEN_SECRET }}" >> .env
+          echo "REFRESH_TOKEN_SECRET=${{ secrets.REFRESH_TOKEN_SECRET }}" >> .env
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
 
       - name: Run tests
         run: npm test
@@ -228,7 +257,7 @@ External Request (port 80)
         ▼
       Nginx
         │
-        ├── /api/*  ──▶  localhost:3000  (Node.js)
+        ├── /api/*  ──▶  rewrite strips /api/  ──▶  localhost:3000  (Node.js)
         │
         └── /*      ──▶  /home/aditya/apps/fullstack-app/client  (static files)
 ```
@@ -316,6 +345,12 @@ sudo systemctl restart nginx
 # nginx status
 sudo systemctl status nginx
 
+# show all active config files nginx is loading
+sudo nginx -T | grep "# configuration file"
+
+# show active config for a specific block
+sudo nginx -T | grep -A 20 "location /api"
+
 # nginx error log
 sudo tail -f /var/log/nginx/error.log
 
@@ -332,10 +367,10 @@ ss -tlnp | grep 3000
 # check what's listening on port 80
 ss -tlnp | grep 80
 
-# test backend directly
-curl http://localhost:3000/api/<route>
+# test backend directly (bypasses nginx)
+curl http://127.0.0.1:3000/<route>
 
-# test via nginx
+# test via nginx (goes through proxy)
 curl http://localhost/api/<route>
 ```
 
